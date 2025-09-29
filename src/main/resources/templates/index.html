@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Vulnerable Feedback</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body{font-family:system-ui, sans-serif; max-width:720px; margin:2rem auto; padding:0 1rem}
+    form{display:grid; gap:.75rem}
+    input,textarea,button{font-size:1rem; padding:.6rem}
+    .ok{background:#e7fff0; border:1px solid #b8f0cc; padding:.75rem; margin:.5rem 0}
+  </style>
+</head>
+<body>
+  <h1>Feedback</h1>
+  <p>เดโม Log4Shell: ใส่ข้อความลงไปแล้วกดส่ง ระบบจะทำการ log ข้อความและ User-Agent</p>
+
+  <form method="post" action="/feedback">
+    <input name="name" placeholder="Your name" required />
+    <textarea name="message" placeholder="Your message" rows="4" required></textarea>
+    <button type="submit">Send</button>
+  </form>
+
+  <div class="ok" th:if="${ok}">Thanks, <b th:text="${name}"></b>!</div>
+</body>
+</html>
