@@ -1,13 +1,16 @@
 package com.example.vuln;
-
+import java.util.List;
+import java.util.ArrayList;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
 
 @Controller
 public class FeedbackController {
@@ -85,5 +88,71 @@ public class FeedbackController {
         model.addAttribute("ok", true);
         model.addAttribute("name", name);
         return "index";
+    }
+    // --- Endpoint ใหม่ที่เพิ่มเข้ามา ---
+    @GetMapping("/admin/delete")
+    @ResponseBody
+    public String deleteUser(@RequestParam String user, HttpServletRequest request) {
+        // บันทึก Log การกระทำที่อันตรายนี้
+        logger.warn("ADMIN ACTION - Attempting to delete user: '{}' from IP: {}", user, request.getRemoteAddr());
+
+        // จำลองการลบผู้ใช้
+        if ("admin".equalsIgnoreCase(user)) {
+            logger.error("CRITICAL: Admin user has been deleted!");
+            return "User '" + user + "' has been deleted. This is a critical security issue.";
+        } else {
+            return "User '" + user + "' deleted.";
+        }
+    }
+    // --- สถานการณ์จำลองสำหรับ OutOfMemoryError ---
+    // !!! คำเตือน: โค้ดส่วนนี้เขียนขึ้นมาให้มีช่องโหว่โดยเจตนาเพื่อการสาธิตเท่านั้น !!!
+    @GetMapping("/process-items")
+    @ResponseBody
+    public String processItems(@RequestParam(defaultValue = "10") int count) {
+        logger.info("Processing {} items.", count);
+        try {
+            // จุดที่เกิดช่องโหว่: สร้าง List ขนาดใหญ่ตาม Input ของผู้ใช้โดยไม่มีการจำกัด
+            List<byte[]> memoryHog = new ArrayList<>();
+            // วนลูปเพื่อใช้หน่วยความจำจำนวนมาก
+            // 1,048,576 bytes = 1 MB
+            for (int i = 0; i < count; i++) {
+                memoryHog.add(new byte[1_048_576]);
+            }
+            return "Successfully processed " + count + " items. Memory used: " + count + " MB.";
+        } catch (OutOfMemoryError e) {
+            logger.error("!!! OutOfMemoryError Triggered !!! Application might be unstable.", e);
+            // ในสถานการณ์จริง แอปพลิเคชันอาจจะแครชไปก่อนที่จะตอบกลับมาได้
+            return "ERROR: Out of memory. The server is under attack.";
+        }
+    }
+
+    @PostMapping("/upload-slip")
+    @ResponseBody
+    public String uploadSlip(@RequestParam("orderId") String orderId,
+                             @RequestParam("slipFile") MultipartFile slipFile) {
+
+        if (slipFile.isEmpty()) {
+            return "Error: Please select a file to upload.";
+        }
+
+        try {
+            // --- จุดที่เกิดช่องโหว่ ---
+            // ระบบดึงชื่อไฟล์ดั้งเดิมที่ผู้ใช้ตั้งมา เพื่อนำไปบันทึกใน Log
+            String originalFilename = slipFile.getOriginalFilename();
+
+            logger.info("Processing payment for Order ID: {}", orderId);
+            // Log บรรทัดนี้คือหายนะ! Log4j จะประมวลผล 'originalFilename' ที่มี Payload
+            logger.info("Received new payment slip with filename: '{}'", originalFilename);
+            // (ในโลกจริง โค้ดส่วนนี้จะทำการบันทึกไฟล์และประมวลผลต่อไป)
+            // slipFile.transferTo(new File("/path/to/save/" + originalFilename));
+
+            return "Slip for Order ID " + orderId + " uploaded successfully. Filename: " + originalFilename;
+
+        } catch (Exception e) {
+            // ถ้าเกิด DoS สำเร็จ (StackOverflowError) แอปพลิเคชันอาจจะแครชไปเลย
+            // ถ้าใช้เวอร์ชันใหม่หน่อย จะเห็น IllegalStateException ใน Log แทน
+            logger.error("An error occurred during slip processing.", e);
+            return "An unexpected error occurred.";
+        }
     }
 }
